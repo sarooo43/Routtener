@@ -101,13 +101,15 @@ def real_gateway(tmp_path):
             thread.join(timeout=2)
 
 
-def _owner(base):
+def _owner(base, providers=("groq", "deepseek")):
     with httpx.Client(base_url=base, timeout=20) as client:
         r = client.post('/api/v1/keys/generate', json={'label': 'contract test'})
         assert r.status_code == 201
         key = r.json()['api_key']
         headers = {'X-API-Key': key}
         for provider, fake in [('groq', 'gsk_FAKE000000000000'), ('deepseek', 'sk-FAKE000000000000')]:
+            if provider not in providers:
+                continue
             assert client.put('/api/v1/provider-keys/' + provider, headers=headers, json={'api_key': fake}).status_code == 200
         return key
 
@@ -216,3 +218,14 @@ def test_skip_provider_check_skips_the_test_endpoint(real_gateway, tmp_path):
     assert result.returncode == 0, result.stderr
     assert '0 provider check calls (each may try more than one upstream model) + 1 route calls' in result.stdout
     assert 'Provider check groq:' not in result.stdout
+
+
+def test_one_detected_provider_is_still_checked_before_fatal(real_gateway):
+    base, env = real_gateway
+    key = _owner(base, ('groq',))
+    run_env = dict(env, ROUTTENER_EVAL_API_KEY=key)
+    result = subprocess.run([sys.executable, str(ROOT / 'evals' / 'run_resilience_eval.py'), '--live', '--yes-spend-quota', '--base-url', base, '--n', '1'], cwd=ROOT, env=run_env, capture_output=True, text=True, timeout=90)
+    assert result.returncode != 0
+    assert 'Provider check groq: PASS' in result.stdout
+    assert 'FATAL: fewer than 2 provider checks passed' in result.stderr
+    assert key not in result.stdout + result.stderr

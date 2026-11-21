@@ -825,10 +825,10 @@ def main() -> None:
                             if not report.ok:
                                 raise SystemExit(f"FATAL: {report.blocker}")
                             return {"scenario": "provider_down", "dry_run": True, "requests_sent": 0}
-                        if not report.ok:
-                            raise SystemExit(f"FATAL: refusing to run --live: {report.blocker}")
                         if not args.skip_provider_check:
                             await check_provider_answers(client, report.api_key, report.configured)
+                        if not report.ok:
+                            raise SystemExit(f"FATAL: refusing to run --live: {report.blocker}")
                         return await run_scenario_live(client, report.api_key, args.n)
                     finally:
                         if minted_key and not await revoke_transient_key(client, minted_key, minted=True):
