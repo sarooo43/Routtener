@@ -503,6 +503,33 @@ def print_preflight(report: PreflightReport, base_url: str, *, key_source: str |
         print(_providers_hint(report.api_key, report.minted))
 
 
+async def check_provider_answers(client, api_key: str, providers: list[str]) -> list[str]:
+    """Use the dashboard Test endpoint once per provider; return failed checks."""
+    from app.providers.outcomes import redact
+    failures = []
+    passed = 0
+    for provider in providers:
+        try:
+            response = await client.post(f"/api/v1/provider-test/{provider}", headers={"X-API-Key": api_key})
+            if response.is_success:
+                body = response.json()
+                if body.get("key_valid") is True:
+                    print(f"Provider check {provider}: PASS")
+                    passed += 1
+                    continue
+                detail = str(body.get("error") or body.get("verdict") or "provider test returned no verdict")
+            else:
+                detail = f"HTTP {response.status_code}: {response_detail(response)}"
+        except Exception as exc:  # noqa: BLE001 - continue checking other providers
+            detail = f"{type(exc).__name__}: provider check could not complete"
+        safe = redact(detail.replace(api_key, "[redacted]"))[:1000]
+        print(f"Provider check {provider}: FAIL - {safe}")
+        failures.append(f"{provider}: {safe}")
+    if passed < 2:
+        raise SystemExit("FATAL: fewer than 2 provider checks passed; failures: " + ("; ".join(failures) or "none detected"))
+    return failures
+
+
 async def preflight_live(client, n: int) -> tuple[str, bool]:
     """Backwards-compatible wrapper: collect, print, and refuse if blocked.
 
@@ -734,6 +761,7 @@ def main() -> None:
             "first /api/v1/route call (spends no provider quota). Use it to "
             "prove the backend wiring is right before a real run.",
         )
+        parser.add_argument("--skip-provider-check", action="store_true", help="Skip live provider answer checks (does not verify keys).")
         parser.add_argument(
             "--api-key-prompt", action="store_true",
             help="Read the Routtener API key privately from the terminal.",
@@ -786,7 +814,10 @@ def main() -> None:
                             on_minted=remember_minted,
                         )
                         print_preflight(report, args.base_url, key_source=key_source)
+                        checks = 0 if args.skip_provider_check else len(report.configured)
+                        print(f"Request budget: {checks} provider check calls (each may try more than one upstream model) + {args.n} route calls")
                         if args.dry_run:
+                            print(f"would check {checks} providers")
                             print(
                                 "DRY RUN: no /api/v1/route call was sent, so no "
                                 "provider quota was spent."
@@ -796,6 +827,8 @@ def main() -> None:
                             return {"scenario": "provider_down", "dry_run": True, "requests_sent": 0}
                         if not report.ok:
                             raise SystemExit(f"FATAL: refusing to run --live: {report.blocker}")
+                        if not args.skip_provider_check:
+                            await check_provider_answers(client, report.api_key, report.configured)
                         return await run_scenario_live(client, report.api_key, args.n)
                     finally:
                         if minted_key and not await revoke_transient_key(client, minted_key, minted=True):

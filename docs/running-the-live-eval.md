@@ -46,7 +46,12 @@ After testing the providers and checking their quotas, run:
 .venv/bin/python evals/run_resilience_eval.py --live --yes-spend-quota --api-key-prompt --base-url http://127.0.0.1:8000
 ```
 
-The script will ask for the key again. A completed live run writes
+The script will ask for the key again. Before routing, it calls the dashboard
+Test endpoint once per detected provider and requires at least two to pass.
+Each check may try more than one upstream model and spend quota. A dry run
+prints how many providers it would check but sends no checks; `--skip-provider-check`
+explicitly skips answer checks and does not prove that the providers respond.
+A completed live run writes
 `docs/eval-results.md`; review it before committing. The live run reports the
 router arm only, not a live naive baseline. The mocked eval's naive arm has its
 only provider deliberately down, so its zero success is by construction: it
