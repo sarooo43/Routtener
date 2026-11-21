@@ -106,6 +106,7 @@ def _owner(base, providers=("groq", "deepseek")):
         r = client.post('/api/v1/keys/generate', json={'label': 'contract test'})
         assert r.status_code == 201
         key = r.json()['api_key']
+        assert isinstance(key, str) and key.startswith('rk_')
         headers = {'X-API-Key': key}
         for provider, fake in [('groq', 'gsk_FAKE000000000000'), ('deepseek', 'sk-FAKE000000000000')]:
             if provider not in providers:
@@ -125,7 +126,15 @@ def test_script_fields_exist_on_real_gateway(real_gateway):
         assert isinstance(health['components']['redis'], str)
         providers = client.get('/api/v1/provider-keys', headers=headers).json()
         assert all(isinstance(row['provider_name'], str) and isinstance(row['configured'], bool) for row in providers)
-        assert client.get('/api/v1/admin/chaos/status').status_code == 200
+        status = client.get('/api/v1/admin/chaos/status')
+        assert status.status_code == 200 and isinstance(status.json()['active_chaos'], list)
+        probe = client.post('/api/v1/provider-test/groq', headers=headers)
+        assert probe.status_code == 200
+        assert isinstance(probe.json()['key_valid'], bool)
+        assert isinstance(probe.json()['verdict'], str)
+        assert probe.json()['error'] is None or isinstance(probe.json()['error'], str)
+        bad = client.post('/api/v1/admin/chaos/inject', json={'provider_name': 'nonexistent', 'duration_seconds': 10})
+        assert bad.status_code == 400 and isinstance(bad.json()['detail'], str)
         inject = client.post('/api/v1/admin/chaos/inject', json={'provider_name': 'groq', 'duration_seconds': 10})
         assert inject.status_code == 200
         assert isinstance(inject.json()['provider_name'], str)
