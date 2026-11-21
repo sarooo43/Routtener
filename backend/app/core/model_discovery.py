@@ -15,7 +15,7 @@ ordered set of candidates:
    to the same function, so the Test button and routing cannot disagree.
 2. Try up to ``MAX_CANDIDATE_ATTEMPTS`` per request. When a call fails with
    ``model_not_found`` or ``model_terms_required``, the model is remembered
-   as "denied" for this key (~1h TTL) and the next candidate is tried.
+   as "denied" for this key (24h by default) and the next candidate is tried.
    An auth failure permits one different-family probe; rate limits stop the walk.
 3. If the provider's error message names a replacement model
    ("use models/gemini-3.8-flash"), it is extracted with a STRICT regex,

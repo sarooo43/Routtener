@@ -313,7 +313,8 @@ How the other runners relate (all kept; none is deleted):
   the routing MACHINERY, not real models.
 - `evals/run_resilience_eval.py --live` — a narrower real-traffic probe
   (the provider_down failover scenario only, via Chaos Mode on your running
-  backend). Use it to sanity-check failover on real providers between
+  backend). Its attempt column reports **chain entries (may include skipped providers)**,
+  not provider-call counts. Use it to sanity-check failover on real providers between
   benchmark runs.
 
 ---
@@ -531,7 +532,7 @@ new keys can see models they are not yet allowed to call (Google rolls
 models out per account cohort). Routing and the Test connection button
 therefore walk an ordered candidate list: a model that answers
 `model_not_found` or `model_terms_required` is remembered as "denied" for
-that key for ~1 hour and the next-ranked candidate is tried (up to 3 attempts).
+that key for 24 hours by default and the next-ranked candidate is tried (up to 3 attempts).
 For `auth_failed`, the walk probes at most one model from a different family,
 then stops; it does not mark the model denied. Rate limits stop the walk. If the provider's error
 message names a replacement (`...use models/gemini-3.8-flash`), that id is

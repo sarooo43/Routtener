@@ -143,5 +143,9 @@ def test_live_eval_latency_uses_real_response_and_writes_only_in_copy(real_gatew
     marker = '{\n  "eval": "resilience"'
     payload = json.loads(result.stdout[result.stdout.index(marker):])
     assert payload['scenarios'][0]['router']['mean_latency_ms'] > 0, payload['scenarios'][0]['router']
-    assert 'MODE: LIVE' in (copy / 'docs' / 'eval-results.md').read_text()
+    report = (copy / 'docs' / 'eval-results.md').read_text()
+    assert 'MODE: LIVE' in report
+    assert 'chain entries (may include skipped providers)' in report
+    assert payload['scenarios'][0]['router']['successes'] > 0
+    assert 'groq' in payload['scenarios'][0]['models_called'] and 'deepseek' in payload['scenarios'][0]['models_called']
     assert (actual.read_bytes() if actual.exists() else None) == before

@@ -70,3 +70,5 @@ guarantee of future service.
 For unattended use, `ROUTTENER_EVAL_API_KEY` supplies the active key; the
 legacy `ROUTELLM_EVAL_API_KEY` is used only when the new variable is absent.
 The prompt takes precedence over both. Never put a key into a script or commit.
+
+The results column **chain entries (may include skipped providers)** counts entries in the route fallback chain, not provider calls.

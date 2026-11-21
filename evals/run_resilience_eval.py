@@ -640,7 +640,7 @@ def render_markdown(results: list[dict], n: int, mode: str) -> str:
         "provider error semantics; the failures here are scripted at the "
         "transport boundary.",
         "",
-        "| Scenario | Arm | Success rate | Wilson 95% | Mean attempts | Mean latency (ms) |",
+        ("| Scenario | Arm | Success rate | Wilson 95% | Mean chain entries (may include skipped providers) | Mean latency (ms) |" if mode.startswith("live") else "| Scenario | Arm | Success rate | Wilson 95% | Mean provider attempts | Mean latency (ms) |"),
         "|---|---|---|---|---|---|",
     ]
     for r in results:
@@ -671,7 +671,7 @@ def render_markdown(results: list[dict], n: int, mode: str) -> str:
         "",
         "### First request vs steady state (T4g)",
         "",
-        "| Scenario | Arm | First req attempts | First req latency (ms) | Steady mean attempts | Steady mean latency (ms) |",
+        ("| Scenario | Arm | First req chain entries (may include skipped providers) | First req latency (ms) | Steady mean chain entries (may include skipped providers) | Steady mean latency (ms) |" if mode.startswith("live") else "| Scenario | Arm | First req attempts | First req latency (ms) | Steady mean attempts | Steady mean latency (ms) |"),
         "|---|---|---|---|---|---|",
     ]
     for r in results:
@@ -687,8 +687,7 @@ def render_markdown(results: list[dict], n: int, mode: str) -> str:
             )
     lines += [
         "",
-        "Notes: attempts count REAL provider calls only - pre-flight skips "
-        "(`quota_exceeded`, `circuit_open`) are logged but are not calls. The "
+        ("Notes: chain entries (may include skipped providers) are not provider call counts. The " if mode.startswith("live") else "Notes: attempts count REAL provider calls only - pre-flight skips (`quota_exceeded`, `circuit_open`) are logged but are not calls. The ") +
         "circuit breaker legitimately trips during a run (repeated failures on "
         "the primary), so later requests skip straight to the healthy "
         "secondary; that appears as a falling mean-attempt count, not as "
