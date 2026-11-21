@@ -1,6 +1,7 @@
 """Provider contracts over real sockets; no live provider credentials."""
 import json
 import hashlib
+from datetime import datetime, timezone
 import sqlite3
 import os
 import socket
@@ -83,6 +84,11 @@ def gateway(tmp_path, request):
             key = client.post('/api/v1/keys/generate', json={'label': 'local'}).json()['api_key']
             client.headers['X-API-Key'] = key
             assert client.put('/api/v1/provider-keys/groq', json={'api_key': 'gsk_FAKE000000000000'}).status_code == 200
+            if getattr(request, 'param', None) == 'existing_pin':
+                with sqlite3.connect(tmp_path / 'db') as db:
+                    owner_id = db.execute('SELECT id FROM api_keys ORDER BY id DESC LIMIT 1').fetchone()[0]
+                    db.execute('INSERT INTO provider_model_pins (api_key_id, provider_name, model_id, updated_at) VALUES (?, ?, ?, ?)',
+                               (owner_id, 'groq', ORPHEUS, datetime.now(timezone.utc).isoformat()))
             if getattr(request, 'param', None) == 'stale':
                 process.terminate()
                 process.wait(timeout=10)
@@ -177,3 +183,15 @@ def test_old_persisted_catalog_cannot_expose_filtered_model(gateway):
     assert response.status_code == 200
     ids = [model['id'] for model in response.json()['models']]
     assert ids == ['aaa-chat']
+
+
+@pytest.mark.parametrize('gateway', ['existing_pin'], indirect=True)
+def test_preexisting_pinned_orpheus_still_runs_and_walks(gateway):
+    client, state = gateway
+    state['fail'] = {ORPHEUS}
+    response = client.post('/api/v1/route', json={'prompt': 'hello', 'task_type': 'qa'})
+    body = response.json()
+    assert body['success'] is True and body['model_used'] == 'groq'
+    assert state['attempts'] == [ORPHEUS, 'aaa-chat']
+    assert body['error'].startswith('model_terms_required:')
+    assert ORPHEUS in body['error']
