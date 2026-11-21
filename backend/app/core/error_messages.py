@@ -69,6 +69,7 @@ CONSOLE_URLS = {
 #: "<code>: <what happened, and what to do>". See app/providers/outcomes.py.
 _SELF_DESCRIBING_CODES = (
     "model_not_found",
+    "model_terms_required",
     "endpoint_not_found",
     "bad_request",
     "auth_failed",
@@ -251,8 +252,7 @@ def explain(error: Optional[str], provider: Optional[str] = None) -> Optional[st
 
     if family == "bad_request":
         return (
-            f"bad_request: {name} rejected the request as malformed ({raw}). This is "
-            f"a bug in how the gateway built the request, not your key."
+            f"bad_request: {name} rejected the request ({raw})."
         )
 
     return (

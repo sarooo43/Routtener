@@ -530,8 +530,10 @@ A provider's list-models response is a *candidate list*, not a guarantee:
 new keys can see models they are not yet allowed to call (Google rolls
 models out per account cohort). Routing and the Test connection button
 therefore walk an ordered candidate list: a model that answers
-`model_not_found` is remembered as "denied" for that key for ~1 hour and the
-next-ranked candidate is tried (up to 3 attempts). If the provider's error
+`model_not_found` or `model_terms_required` is remembered as "denied" for
+that key for ~1 hour and the next-ranked candidate is tried (up to 3 attempts).
+For `auth_failed`, the walk probes at most one model from a different family,
+then stops; it does not mark the model denied. Rate limits stop the walk. If the provider's error
 message names a replacement (`...use models/gemini-3.8-flash`), that id is
 strict-regex-extracted, verified against the discovered list, and tried
 first. Nothing else from an error message is ever used. If every candidate

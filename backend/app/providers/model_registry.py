@@ -198,10 +198,17 @@ def key_transport(provider: str) -> str:
     )
 
 
+# ASSUMED from model names: OpenAI-shaped provider lists do not consistently
+# advertise a chat capability; keep this conservative shared denylist here.
+ASSUMED_NON_CHAT_NAME_MARKERS = (
+    "tts", "orpheus", "whisper", "speech", "transcribe", "embed", "moderation",
+)
+
+
 def is_chat_capable(spec: ProviderSpec, model_id: str) -> bool:
     """Filter out embeddings, audio, image and other non-chat endpoints."""
     lowered = model_id.lower()
-    return not any(marker in lowered for marker in spec.non_chat_markers)
+    return not any(marker in lowered for marker in (*spec.non_chat_markers, *ASSUMED_NON_CHAT_NAME_MARKERS))
 
 
 def key_fingerprint(api_key: str) -> str:
@@ -619,11 +626,14 @@ class ModelCatalog:
         if not force_refresh:
             entry = self._cache.get(self._key(spec.name, api_key))
             if entry and entry.fresh(time.monotonic(), self._ttl):
-                return list(entry.models), dict(entry.meta), "cache"
+                ids = [model for model in entry.models if is_chat_capable(spec, model)]
+                if ids:
+                    return ids, dict(entry.meta), "cache"
             # Cold process (first request after a restart): a database row
             # written less than TTL ago is as good as a fresh fetch and costs
             # no provider call.
             ids, meta = await self._load_persisted(spec.name, api_key)
+            ids = [model for model in ids if is_chat_capable(spec, model)]
             if ids:
                 self.store(spec.name, api_key, ids, source="cache", meta=meta)
                 return ids, meta, "db_cache"

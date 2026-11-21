@@ -17,7 +17,7 @@ Rules enforced here, and tested:
 *   only **401/403** may say anything about the key;
 *   **404** is a targeting problem: the model or the endpoint does not exist.
     The message names the model and the URL host, never the key;
-*   **400** is a malformed request — include the provider's message;
+*   **400** is a rejected request — include the provider's message;
 *   429 and 5xx keep their own identities;
 *   a sanitized slice of the provider body is always kept, so the next person
     debugging this can see what the provider actually said.
@@ -46,6 +46,7 @@ OUTCOMES = frozenset(
         "auth_failed",
         "missing_provider_key",
         "model_not_found",
+        "model_terms_required",
         "endpoint_not_found",
         "not_found",
         "bad_request",
@@ -182,12 +183,12 @@ def describe_failure(
             f"endpoint_not_found: {label} has nothing at that path (HTTP "
             f"{status_code}). The request URL is wrong, not the key.{detail}"
         )
+    if outcome == "model_terms_required":
+        return (f"model_terms_required: {label} needs your organization to accept terms "
+                f"before model {model} can be used. Pick another model, or accept the "
+                f"terms in the provider's console.{detail}")
     if outcome == "bad_request":
-        return (
-            f"bad_request: {label} rejected the request as malformed (HTTP "
-            f"{status_code}). This is a bug in how the request was built, not "
-            f"your key.{detail}"
-        )
+        return f"bad_request: {label} rejected the request (HTTP {status_code}).{detail}"
     if outcome == "rate_limit_exceeded":
         return f"rate_limit_exceeded: {label} is rate limiting this key (HTTP 429).{detail}"
     if outcome == "provider_server_error":
@@ -221,6 +222,17 @@ def error_for_status(
     """
     status_code = response.status_code
     outcome = classify_status(status_code)
+    if status_code == 400 and model_call and model:
+        try:
+            payload = response.json()
+            error = payload.get("error", {}) if isinstance(payload, dict) else {}
+            if isinstance(error, dict):
+                code = str(error.get("code") or "").lower()
+                message = str(error.get("message") or "").lower()
+                if code == "model_terms_required" or ("terms" in message and ("acceptance" in message or "accept" in message) and ("require" in message or "must" in message)):
+                    outcome = "model_terms_required"
+        except (ValueError, TypeError):
+            pass
     if outcome == "not_found":
         outcome = "model_not_found" if (model_call and model and has_auth_header) else "endpoint_not_found"
     elif (
