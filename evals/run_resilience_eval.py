@@ -525,7 +525,18 @@ async def check_provider_answers(client, api_key: str, providers: list[str]) -> 
         except Exception as exc:  # noqa: BLE001 - continue checking other providers
             model = "unavailable"
             detail = f"{type(exc).__name__}: provider check could not complete"
-        if "reply_length=" not in detail:
+        if detail.startswith("empty_response"):
+            # Print only explicitly validated metadata, never provider reply text.
+            def number(name):
+                match = re.search(r"\b" + name + r"=(\d{1,8})(?=\s|$)", detail)
+                return match.group(1) if match else "unavailable"
+
+            match = re.search(r"\bfinish_reason=([A-Z_]+)(?=\s|$)", detail)
+            allowed = {"STOP", "LENGTH", "MAX_TOKENS", "CONTENT_FILTER", "SAFETY", "RECITATION", "OTHER"}
+            reason = match.group(1) if match and match.group(1) in allowed else "unavailable"
+            detail = (f"empty_response: reply_length={number('reply_length')} "
+                      f"finish_reason={reason} completion_tokens={number('completion_tokens')}")
+        elif "reply_length=" not in detail:
             detail += " reply_length=unavailable"
         safe_model = redact(model.replace(api_key, "[redacted]"))[:200]
         safe = f"model={safe_model} " + redact(detail.replace(api_key, "[redacted]"))[:1000]
