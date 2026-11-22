@@ -1,4 +1,4 @@
-# RouteLLM backend — development/test dependencies.
+# Routtener backend — development/test dependencies.
 #
 # Install with:  pip install -r backend/requirements-dev.txt
 # (This file includes the runtime set, then adds tooling.)
