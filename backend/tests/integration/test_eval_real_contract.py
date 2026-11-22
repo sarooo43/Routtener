@@ -52,7 +52,7 @@ class ProviderStub(BaseHTTPRequestHandler):
 
 
 @pytest.fixture
-def real_gateway(tmp_path):
+def real_gateway(tmp_path, request):
     ProviderStub.failures = set()
     ProviderStub.terms_first = False
     ProviderStub.calls = []
@@ -73,9 +73,12 @@ def real_gateway(tmp_path):
                PYTHONPATH=str(ROOT / 'backend'))
     for name in ('ROUTTENER_EVAL_API_KEY', 'ROUTELLM_EVAL_API_KEY', 'GROQ_API_KEY', 'DEEPSEEK_API_KEY', 'GEMINI_API_KEY'):
         env.pop(name, None)
+    if getattr(request, 'param', None) == 'auth':
+        env['REQUIRE_API_KEY'] = 'true'
     with (tmp_path / 'server.log').open('w+') as log:
         proc = subprocess.Popen([sys.executable, '-c', preamble], cwd=ROOT / 'backend', env=env, stdout=log, stderr=subprocess.STDOUT)
         base = f'http://127.0.0.1:{port}'
+        ProviderStub.gateway_process = proc
         try:
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
@@ -255,3 +258,133 @@ def test_live_results_label_with_actual_upstream_failure_and_fallback(real_gatew
     assert sum(name == 'gemini' for name, _ in ProviderStub.calls) >= 2
     assert 'chain entries (may include skipped providers)' in (copy / 'docs' / 'eval-results.md').read_text()
     assert key not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize('real_gateway', ['auth'], indirect=True)
+@pytest.mark.parametrize('supplied', [False, True], ids=['minted', 'supplied'])
+@pytest.mark.parametrize('event', ['success', 'fatal', 'exception', 'sigint', 'server_death', 'preflight_sigint', 'preflight_death'])
+def test_exit_matrix_real_process(real_gateway, tmp_path, supplied, event):
+    """Forward through a real socket while witnessing key ownership and cleanup."""
+    import signal
+
+    base, env = real_gateway
+    gateway_process = ProviderStub.gateway_process
+    state = {'key': None, 'deletes': 0, 'deleted': False}
+    entered = threading.Event()
+    release = threading.Event()
+    if supplied:
+        state['key'] = _owner(base, () if event == 'fatal' else ('groq', 'deepseek'))
+
+    class Proxy(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def forward(self):
+            body = self.rfile.read(int(self.headers.get('Content-Length', '0')))
+            if self.command == 'DELETE' and self.path == '/api/v1/keys/me':
+                state['deletes'] += 1
+            if ((self.path == '/api/v1/route' and event in ('sigint', 'server_death')) or
+                (self.path == '/api/v1/provider-keys' and event in ('preflight_sigint', 'preflight_death'))):
+                entered.set()
+                release.wait(30)
+            if self.path == '/api/v1/route' and event == 'exception':
+                status, content = 500, b'{"detail":"local scenario failure"}'
+            else:
+                try:
+                    response = httpx.request(self.command, base + self.path, content=body,
+                                             headers={'Content-Type': 'application/json',
+                                                      'X-API-Key': self.headers.get('X-API-Key', '')}, timeout=10)
+                    status, content = response.status_code, response.content
+                    if self.path == '/api/v1/keys/generate' and status == 201:
+                        state['key'] = response.json()['api_key']
+                        if event != 'fatal':
+                            headers = {'X-API-Key': state['key']}
+                            for provider, fake in [('groq', 'gsk_FAKE000000000000'), ('deepseek', 'sk-FAKE000000000000')]:
+                                saved = httpx.put(base + '/api/v1/provider-keys/' + provider,
+                                                  headers=headers, json={'api_key': fake}, timeout=20)
+                                if saved.status_code != 200:
+                                    raise AssertionError('test-only provider setup failed')
+                    if self.command == 'DELETE' and self.path == '/api/v1/keys/me' and status == 200:
+                        state['deleted'] = True
+                except httpx.HTTPError:
+                    status, content = 502, b'{}'
+            try:
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        do_GET = forward
+        do_POST = forward
+        do_DELETE = forward
+
+    proxy = ThreadingHTTPServer(('127.0.0.1', 0), Proxy)
+    thread = threading.Thread(target=proxy.serve_forever, daemon=True)
+    thread.start()
+    copy = tmp_path / 'copy'
+    shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns('.git', '.venv', 'node_modules', '__pycache__', '.pytest_cache', 'data', 'dist', '*.db', '.env'))
+    run_env = dict(env, PYTHONPATH=str(copy / 'backend'))
+    if supplied:
+        run_env['ROUTTENER_EVAL_API_KEY'] = state['key']
+    else:
+        run_env.pop('ROUTTENER_EVAL_API_KEY', None)
+        run_env.pop('ROUTELLM_EVAL_API_KEY', None)
+    bootstrap = "import runpy,signal,sys;signal.signal(signal.SIGINT,signal.default_int_handler);p=sys.argv.pop(1);runpy.run_path(p,run_name='__main__')"
+    process = subprocess.Popen([sys.executable, '-c', bootstrap, str(copy / 'evals' / 'run_resilience_eval.py'),
+                                '--live', '--yes-spend-quota', '--skip-provider-check', '--n', '1',
+                                '--base-url', f'http://127.0.0.1:{proxy.server_port}'],
+                               cwd=copy, env=run_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        if event in ('sigint', 'server_death', 'preflight_sigint', 'preflight_death'):
+            assert entered.wait(30), 'eval did not reach the expected stage'
+            if event in ('sigint', 'preflight_sigint'):
+                process.send_signal(signal.SIGINT)
+            else:
+                gateway_process.terminate()
+                gateway_process.wait(timeout=10)
+                release.set()
+        stdout, stderr = process.communicate(timeout=40)
+        assert state['key'] not in stdout + stderr
+        assert (process.returncode == 0) == (event == 'success')
+        if supplied:
+            assert state['deletes'] == 0
+            if event not in ('server_death', 'preflight_death'):
+                assert httpx.get(base + '/api/v1/keys/me', headers={'X-API-Key': state['key']}).status_code == 200
+        elif event in ('server_death', 'preflight_death'):
+            assert state['deletes'] == 1 and not state['deleted']
+            assert 'could not revoke transient API key ' + state['key'][:8] in stderr
+        else:
+            assert state['deletes'] == 1 and state['deleted']
+            assert 'API key: revoked' in stdout
+            assert httpx.get(base + '/api/v1/keys/me', headers={'X-API-Key': state['key']}).status_code == 401
+    finally:
+        release.set()
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+        proxy.shutdown()
+        proxy.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize('real_gateway', ['auth'], indirect=True)
+@pytest.mark.parametrize('supplied', [False, True], ids=['minted', 'supplied'])
+def test_invalid_url_does_not_mint_or_revoke(real_gateway, supplied):
+    base, env = real_gateway
+    key = _owner(base, ()) if supplied else None
+    run_env = dict(env)
+    if key:
+        run_env['ROUTTENER_EVAL_API_KEY'] = key
+    result = subprocess.run([sys.executable, str(ROOT / 'evals' / 'run_resilience_eval.py'),
+                             '--live', '--yes-spend-quota', '--base-url', 'http://:8000'],
+                            cwd=ROOT, env=run_env, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 2
+    assert 'FATAL: --base-url is not a valid URL' in result.stderr
+    assert 'minting a throwaway key' not in result.stdout
+    assert 'API key: revoked' not in result.stdout
+    if key:
+        assert key not in result.stdout + result.stderr
+        assert httpx.get(base + '/api/v1/keys/me', headers={'X-API-Key': key}).status_code == 200
