@@ -31,6 +31,9 @@ class ProviderResponse(BaseModel):
     #: failure, None when no response arrived — network/timeout). The
     #: diagnostics table reports it per probe row.
     http_status: Optional[int] = None
+    reply_length: Optional[int] = None
+    finish_reason: Optional[str] = None
+    completion_tokens: Optional[int] = None
 
 
 class ModelProvider(ABC):
@@ -79,9 +82,19 @@ def make_success(
     tokens_used,
     latency_ms: float,
     http_status: Optional[int] = 200,
+    finish_reason=None,
+    completion_tokens=None,
 ) -> ProviderResponse:
     if not text or not text.strip():
-        return make_error(provider_name, model_name, "empty_response", latency_ms)
+        result = make_error(provider_name, model_name, "empty_response", latency_ms,
+                            outcome="empty_response", http_status=http_status)
+        result.reply_length = len(text) if isinstance(text, str) else 0
+        # Untrusted provider values are not allowed to smuggle content or keys into logs.
+        if isinstance(finish_reason, str) and finish_reason.upper() in {"STOP", "LENGTH", "MAX_TOKENS", "CONTENT_FILTER", "SAFETY", "RECITATION", "OTHER"}:
+            result.finish_reason = finish_reason.upper()
+        if type(completion_tokens) is int and 0 <= completion_tokens <= 10000000:
+            result.completion_tokens = completion_tokens
+        return result
     return ProviderResponse(
         success=True,
         text=text,

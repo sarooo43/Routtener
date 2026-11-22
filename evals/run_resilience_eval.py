@@ -510,9 +510,11 @@ async def check_provider_answers(client, api_key: str, providers: list[str]) -> 
     passed = 0
     for provider in providers:
         try:
-            response = await client.post(f"/api/v1/provider-test/{provider}", headers={"X-API-Key": api_key})
+            response = await client.post(f"/api/v1/provider-test/{provider}", params={"answer_check": "true"}, headers={"X-API-Key": api_key})
+            model = "unavailable"
             if response.is_success:
                 body = response.json()
+                model = str(body.get("model") or "unavailable")
                 if body.get("key_valid") is True:
                     print(f"Provider check {provider}: PASS")
                     passed += 1
@@ -521,8 +523,12 @@ async def check_provider_answers(client, api_key: str, providers: list[str]) -> 
             else:
                 detail = f"HTTP {response.status_code}: {response_detail(response)}"
         except Exception as exc:  # noqa: BLE001 - continue checking other providers
+            model = "unavailable"
             detail = f"{type(exc).__name__}: provider check could not complete"
-        safe = redact(detail.replace(api_key, "[redacted]"))[:1000]
+        if "reply_length=" not in detail:
+            detail += " reply_length=unavailable"
+        safe_model = redact(model.replace(api_key, "[redacted]"))[:200]
+        safe = f"model={safe_model} " + redact(detail.replace(api_key, "[redacted]"))[:1000]
         print(f"Provider check {provider}: FAIL - {safe}")
         failures.append(f"{provider}: {safe}")
     if passed < 2:
