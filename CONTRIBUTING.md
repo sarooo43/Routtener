@@ -15,7 +15,7 @@ Redis.
 
 ```bash
 git clone https://github.com/sarooo43/Routtener.git
-cd Routellm
+cd Routtener
 python run.py
 ```
 

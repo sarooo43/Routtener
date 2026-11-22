@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
     ('AGENTS.md.txt', '# Project: Routtener'),
     ('doc/prd.md.txt', 'Project Name: Routtener'),
     ('doc/README.md.txt', '# 🔀 Routtener'),
+    ('CONTRIBUTING.md', 'cd Routtener'),
 ])
 def test_legacy_docs_use_current_project_name(path, expected):
     with socket.socket() as probe:
