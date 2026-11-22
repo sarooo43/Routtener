@@ -20,12 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   acceptance errors now explain the provider response and can advance the
   existing same-provider model walk; generic HTTP 400 errors no longer assert
   a cause that was not established.
-- The live resilience eval checks each detected provider through the dashboard
+- The non-dry live resilience eval checks each detected provider through the dashboard
   Test endpoint unless explicitly skipped. Its live results label fallback-chain
   entries as entries that may include skipped providers, not provider calls.
 - Live eval credential handling supports a hidden-key prompt, validates the
-  backend URL and supplied key before use, and revokes minted keys on exit;
-  revocation failures are reported with a prefix and a nonzero exit. The
+  backend URL and supplied key before use, and attempts to revoke minted keys
+  on exit; revocation failures are reported with a prefix and a nonzero exit. The
   dashboard shows the active key prefix and saved-provider count, and the
   repository runbook explains the live workflow.
 
@@ -114,8 +114,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Chaos-mode fault injection for demonstrating failover.
 - **Live-eval tests run the real script as a subprocess** against a real
   uvicorn on an OS-chosen port: 0/1/2 providers saved, Chaos disabled, a minted
-  key provably revoked, a user-supplied key never revoked, and zero
-  `/api/v1/route` calls on `--dry-run`.
+  key provably revoked, a user-supplied key not revoked, and zero
+  `/api/v1/route` calls on `--dry-run`. Real-subprocess coverage also checks
+  scenario failures, interrupts, and server loss for minted and supplied keys.
 - **Provider wire-contract tests over a real local socket**, replacing the
   assumption that a `respx` fake returns the shape a provider really sends.
 - **The benchmark report also lands in `docs/benchmark-results.md`.** The one
