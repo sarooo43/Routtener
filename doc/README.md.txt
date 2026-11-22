@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔀 RouteLLM — Intelligent Multi-Model AI Router
+# 🔀 Routtener — Intelligent Multi-Model AI Router
 
 **A self-healing LLM gateway that routes tasks to the best-fit model and automatically fails over when one breaks.**
 
@@ -21,7 +21,7 @@
 
 ## 📌 Overview
 
-RouteLLM is an intelligent middle-layer API that sits between your application and multiple LLM providers (GLM, Gemini, Groq, etc.). Instead of hardcoding which model to call, RouteLLM:
+Routtener is an intelligent middle-layer API that sits between your application and multiple LLM providers (GLM, Gemini, Groq, etc.). Instead of hardcoding which model to call, Routtener:
 
 - **Classifies** each incoming task (code, creative writing, Q&A, summarization)
 - **Scores** every available model based on capability fit, historical success rate, cost, and latency
@@ -29,7 +29,7 @@ RouteLLM is an intelligent middle-layer API that sits between your application a
 - **Self-heals** using a circuit breaker pattern — temporarily disabling models that keep failing and re-testing them after a cooldown
 - **Visualizes** everything in a real-time animated dashboard — live request feed, model health, fallback chains, cost analytics
 
-> Built to solve a real production problem: apps that depend on a single LLM provider break the moment that provider rate-limits, goes down, or runs out of credits. RouteLLM makes multi-model usage resilient and observable.
+> Built to solve a real production problem: apps that depend on a single LLM provider break the moment that provider rate-limits, goes down, or runs out of credits. Routtener makes multi-model usage resilient and observable.
 
 ---
 
@@ -118,7 +118,7 @@ Models are ranked by score → the top-ranked model is called first → on failu
 ## 📂 Project Structure
 
 ```
-routellm/
+Routtener/
 ├── backend/
 │   ├── app/
 │   │   ├── api/            # route handlers
@@ -153,8 +153,8 @@ routellm/
 
 ### 1. Clone & configure
 ```bash
-git clone https://github.com/[your-username]/routellm.git
-cd routellm
+git clone https://github.com/sarooo43/Routtener.git
+cd Routtener
 cp .env.example .env
 # Add your API keys to .env
 ```
@@ -272,6 +272,6 @@ MIT © 2026 Saboor Nasar
 
 <div align="center">
 
-**[⬆ back to top](#-routellm--intelligent-multi-model-ai-router)**
+**[⬆ back to top](#-routtener--intelligent-multi-model-ai-router)**
 
 </div>

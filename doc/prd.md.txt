@@ -1,5 +1,5 @@
 PRD (Product Requirements Document)
-Project Name: RouteLLM — Intelligent Multi-Model AI Router
+Project Name: Routtener — Intelligent Multi-Model AI Router
 
 Problem
 Apps using multiple LLM providers break when one model fails, rate-limits, or runs out of credits. No system intelligently picks the right model per task AND self-heals on failure.
