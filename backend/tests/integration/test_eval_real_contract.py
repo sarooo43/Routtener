@@ -136,6 +136,14 @@ def test_script_fields_exist_on_real_gateway(real_gateway):
         assert isinstance(probe.json()['key_valid'], bool)
         assert isinstance(probe.json()['verdict'], str)
         assert probe.json()['error'] is None or isinstance(probe.json()['error'], str)
+        ProviderStub.failures = {'deepseek'}
+        failed_probe = client.post('/api/v1/provider-test/deepseek', headers=headers)
+        assert failed_probe.status_code == 200
+        assert failed_probe.json()['key_valid'] is False
+        assert isinstance(failed_probe.json()['verdict'], str)
+        assert isinstance(failed_probe.json()['error'], str)
+        assert 'stub rejected key' in failed_probe.json()['error']
+        ProviderStub.failures = set()
         bad = client.post('/api/v1/admin/chaos/inject', json={'provider_name': 'nonexistent', 'duration_seconds': 10})
         assert bad.status_code == 400 and isinstance(bad.json()['detail'], str)
         inject = client.post('/api/v1/admin/chaos/inject', json={'provider_name': 'groq', 'duration_seconds': 10})

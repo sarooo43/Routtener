@@ -3,7 +3,8 @@
 OBSERVED: HTTP consumers are `run_resilience_eval.py`, `run_benchmark.py`,
 and their shared `harness.py`. Other eval result dictionaries are local objects,
 not backend HTTP responses. `test_script_fields_exist_on_real_gateway` exercises
-the shapes below with a real uvicorn gateway and local upstream.
+the shapes below with a real uvicorn gateway and local upstream, including
+both a successful and a failed dashboard provider check.
 
 | Consumer file:line | Backend response field | Definition file:line | Type |
 |---|---|---|---|
