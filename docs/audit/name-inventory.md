@@ -1,6 +1,8 @@
-# Name inventory (partial)
+# Name inventory
 
-OBSERVED: This conservative source search includes non-visible identifiers as well as visible text; it excludes test files. `REVIEW` entries have not been resolved and this is not a completed visible-text inventory. Historical evidence outside CHANGELOG is retained rather than rewritten. Protected `docs/deploy/` is included for reference and was not edited.
+Scope: UI strings, README, docs, CLI output. Not a complete audit.
+
+OBSERVED: This conservative source search includes non-visible identifiers as well as visible text; it excludes test files. The ten previously unresolved entries are classified below; the wider search is not a complete audit. Historical evidence outside CHANGELOG is retained rather than rewritten. Protected `docs/deploy/` is included for reference and was not edited.
 
 | Source:line | Mark | Reason |
 |---|---|---|
@@ -25,7 +27,7 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `README.md:241` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `README.md:263` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `README.md:374` | INTENTIONAL | rename history and upstream disambiguation |
-| `README.md:409` | REVIEW | verify visibility and whether this is a stable identifier |
+| `README.md:409` | keep | Example PostgreSQL database name; not project branding. |
 | `README.md:581` | INTENTIONAL | rename history and upstream disambiguation |
 | `backend/app/api/openai_compat_routes.py:35` | INTENTIONAL | rename history and upstream disambiguation |
 | `backend/app/api/openai_compat_routes.py:37` | INTENTIONAL | compatibility name, protected identifier or source reference |
@@ -46,7 +48,7 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `backend/app/config.py:173` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/db/session.py:68` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/db/session.py:90` | INTENTIONAL | compatibility name, protected identifier or source reference |
-| `backend/app/db/session.py:91` | REVIEW | verify visibility and whether this is a stable identifier |
+| `backend/app/db/session.py:91` | keep | Example PostgreSQL database name in diagnostic guidance. |
 | `backend/app/env_compat.py:3` | INTENTIONAL | rename history and upstream disambiguation |
 | `backend/app/env_compat.py:4` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/env_compat.py:10` | INTENTIONAL | compatibility name, protected identifier or source reference |
@@ -63,7 +65,7 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `backend/app/local.py:29` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/local.py:50` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/local.py:53` | INTENTIONAL | compatibility name, protected identifier or source reference |
-| `backend/app/local.py:63` | REVIEW | verify visibility and whether this is a stable identifier |
+| `backend/app/local.py:63` | keep | Existing per-user data-directory identifier; changing it breaks compatibility. |
 | `backend/app/local.py:104` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/local.py:111` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/main.py:9` | INTENTIONAL | compatibility name, protected identifier or source reference |
@@ -72,12 +74,12 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `backend/app/runtime.py:11` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/runtime.py:14` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `backend/app/runtime.py:33` | INTENTIONAL | compatibility name, protected identifier or source reference |
-| `benchmark/generate_report.py:4` | REVIEW | verify visibility and whether this is a stable identifier |
+| `benchmark/generate_report.py:4` | not-visible | Internal module docstring describing result keys. |
 | `benchmark/generate_report.py:59` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `benchmark/generate_report.py:84` | INTENTIONAL | compatibility name, protected identifier or source reference |
-| `benchmark/generate_report.py:109` | REVIEW | verify visibility and whether this is a stable identifier |
-| `benchmark/generate_report.py:111` | REVIEW | verify visibility and whether this is a stable identifier |
-| `benchmark/generate_report.py:216` | REVIEW | verify visibility and whether this is a stable identifier |
+| `benchmark/generate_report.py:109` | not-visible | Internal result dictionary key. |
+| `benchmark/generate_report.py:111` | not-visible | Internal result dictionary key. |
+| `benchmark/generate_report.py:216` | not-visible | Internal plotting dataset keys. |
 | `benchmark/run_benchmark.py:18` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `benchmark/run_benchmark.py:398` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `docs/architecture.md:152` | INTENTIONAL | compatibility name, protected identifier or source reference |
@@ -184,7 +186,7 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `docs/verification.md:392` | INTENTIONAL | historical audit evidence or protected identifier |
 | `docs/verification.md:396` | INTENTIONAL | historical audit evidence or protected identifier |
 | `docs/verification.md:420` | INTENTIONAL | historical audit evidence or protected identifier |
-| `evals/harness.py:357` | REVIEW | verify visibility and whether this is a stable identifier |
+| `evals/harness.py:357` | not-visible | Source comment about secret redaction. |
 | `evals/run_resilience_eval.py:80` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `evals/run_resilience_eval.py:84` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `evals/run_resilience_eval.py:90` | INTENTIONAL | compatibility name, protected identifier or source reference |
@@ -203,8 +205,8 @@ OBSERVED: This conservative source search includes non-visible identifiers as we
 | `examples/webhook/receiver.py:41` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `examples/webhook/receiver.py:42` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `examples/webhook/receiver.py:44` | INTENTIONAL | compatibility name, protected identifier or source reference |
-| `frontend/src/api/client.ts:100` | REVIEW | verify visibility and whether this is a stable identifier |
-| `frontend/src/api/client.ts:108` | REVIEW | verify visibility and whether this is a stable identifier |
+| `frontend/src/api/client.ts:100` | not-visible | TypeScript source comment, not UI text. |
+| `frontend/src/api/client.ts:108` | not-visible | TypeScript source comment, not UI text. |
 | `frontend/src/api/keyStorage.ts:19` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `frontend/src/api/keyStorage.ts:20` | INTENTIONAL | compatibility name, protected identifier or source reference |
 | `frontend/src/api/keyStorage.ts:21` | INTENTIONAL | compatibility name, protected identifier or source reference |

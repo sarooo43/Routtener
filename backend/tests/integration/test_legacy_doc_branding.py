@@ -39,3 +39,22 @@ def test_legacy_docs_use_current_project_name(path, expected):
     finally:
         process.terminate()
         process.wait(timeout=10)
+
+
+def test_name_inventory_classification_via_real_subprocess():
+    process = subprocess.run([sys.executable, '-c',
+        'import pathlib,sys;sys.stdout.write(pathlib.Path(sys.argv[1]).read_text())',
+        str(ROOT / 'docs/audit/name-inventory.md')], capture_output=True, text=True, timeout=10)
+    assert process.returncode == 0
+    text = process.stdout
+    assert 'Scope: UI strings, README, docs, CLI output. Not a complete audit.' in text
+    marks = {
+        'README.md:409': 'keep', 'backend/app/db/session.py:91': 'keep',
+        'backend/app/local.py:63': 'keep', 'benchmark/generate_report.py:4': 'not-visible',
+        'benchmark/generate_report.py:109': 'not-visible', 'benchmark/generate_report.py:111': 'not-visible',
+        'benchmark/generate_report.py:216': 'not-visible', 'evals/harness.py:357': 'not-visible',
+        'frontend/src/api/client.ts:100': 'not-visible', 'frontend/src/api/client.ts:108': 'not-visible',
+    }
+    for path, mark in marks.items():
+        assert f'| `{path}` | {mark} |' in text
+    assert '| REVIEW |' not in text
