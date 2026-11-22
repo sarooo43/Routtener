@@ -18,11 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Corrected stale Routtener project names and checkout instructions in legacy
   planning documents, the contributing guide and the dev-requirements header.
 
-- Discovery excludes model names associated with non-chat use (an assumed
-  name-based filter where capability data is unavailable). Per-model terms
-  acceptance errors now explain the provider response and can advance the
-  existing same-provider model walk; generic HTTP 400 errors no longer assert
-  a cause that was not established.
+- Groq and other providers filter non-chat model names at token starts using
+  an assumed denylist where capability data is unavailable. Per-model
+  `model_terms_required` errors explain the provider response and can advance
+  the existing same-provider model walk; generic HTTP 400 errors no longer
+  assert a cause that was not established.
 - The non-dry live resilience eval checks each detected provider through the dashboard
   Test endpoint unless explicitly skipped. Its live results label fallback-chain
   entries as entries that may include skipped providers, not provider calls.

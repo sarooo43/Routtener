@@ -58,3 +58,16 @@ def test_name_inventory_classification_via_real_subprocess():
     for path, mark in marks.items():
         assert f'| `{path}` | {mark} |' in text
     assert '| REVIEW |' not in text
+
+
+def test_unreleased_notes_cover_required_live_eval_changes():
+    process = subprocess.run([sys.executable, '-c',
+        'import pathlib,sys;sys.stdout.write(pathlib.Path(sys.argv[1]).read_text())',
+        str(ROOT / 'CHANGELOG.md')], capture_output=True, text=True, timeout=10)
+    assert process.returncode == 0
+    unreleased = process.stdout.split('## [Unreleased]', 1)[1]
+    for phrase in ('Groq and other providers filter non-chat', 'model_terms_required',
+                   'same-provider model walk', 'generic HTTP 400',
+                   'checks each detected provider', 'attempts to revoke minted keys',
+                   'prefix and a nonzero exit'):
+        assert phrase in unreleased
