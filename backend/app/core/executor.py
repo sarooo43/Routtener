@@ -632,7 +632,7 @@ async def _execute_provider_attempt(
         AttemptLog(
             provider_name=provider_name,
             success=step.success,
-            error=step.reason or step.error,
+            error=(step.error if step.reason == "model_terms_required" else step.reason or step.error),
             latency_ms=step.latency_ms,
             model=step.model,
         )

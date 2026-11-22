@@ -53,6 +53,7 @@ VERDICT_BY_OUTCOME = {
     "auth_failed": "auth_failed",
     "missing_provider_key": "auth_failed",
     "model_not_found": "model_not_found",
+    "model_terms_required": "model_terms_required",
     "endpoint_not_found": "model_not_found",
     "not_found": "model_not_found",
     "rate_limit_exceeded": "rate_limited",

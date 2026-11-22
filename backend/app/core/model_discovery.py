@@ -14,8 +14,9 @@ ordered set of candidates:
    2.0, 10.0 > 9.0). ONE ranking implementation — ``choose_model`` delegates
    to the same function, so the Test button and routing cannot disagree.
 2. Try up to ``MAX_CANDIDATE_ATTEMPTS`` per request. When a call fails with
-   ``model_not_found`` ONLY (never auth/rate-limit), the model is remembered
-   as "denied" for this key (~1h TTL) and the next candidate is tried.
+   ``model_not_found`` or ``model_terms_required``, the model is remembered
+   as "denied" for this key (24h by default) and the next candidate is tried.
+   An auth failure permits one different-family probe; rate limits stop the walk.
 3. If the provider's error message names a replacement model
    ("use models/gemini-3.8-flash"), it is extracted with a STRICT regex,
    verified against the discovered list, and tried first. Nothing else from
@@ -689,9 +690,9 @@ def _is_model_not_found(response: ProviderResponse) -> bool:
     400 "Model Not Exist" is also a targeting failure and outcomes.py maps
     it there (see ``app.providers.outcomes``).
     """
-    if response.outcome == "model_not_found":
+    if response.outcome in {"model_not_found", "model_terms_required"}:
         return True
-    return bool((response.error or "").startswith("model_not_found"))
+    return bool((response.error or "").startswith(("model_not_found", "model_terms_required")))
 
 
 def _is_rate_limited(response: ProviderResponse) -> bool:
@@ -771,7 +772,7 @@ async def walk_candidates(
     the Auto allow-list) is tried first.
 
     Walk policy (T3):
-    - 404/400 model-not-found -> next candidate.
+    - model-not-found or model-terms-required -> next candidate.
     - 403 -> ONE probe of a different family, then stop. KNOWN LIMIT,
       stated honestly: we cannot verify that a Gemini 403 is always
       key-wide (cohort 404s exist too), so one cross-family probe is the
@@ -887,7 +888,7 @@ async def walk_candidates(
                 WalkStep(
                     model=model_id,
                     skipped=False,
-                    reason="model_not_found",
+                    reason=response.outcome or "model_not_found",
                     success=False,
                     error=error,
                     latency_ms=response.latency_ms,
@@ -1121,7 +1122,8 @@ async def generate_with_walking(
     denied = denied_models(api_key, provider_name)
     if db_session is not None and api_key_id is not None:
         denied |= await db_denied_models(db_session, api_key_id, provider_name)
-    initial_reason = "model_not_found" if _is_model_not_found(response) else "auth_failed"
+    initial_reason = (response.outcome if response.outcome == "model_terms_required" else
+                      "model_not_found" if _is_model_not_found(response) else "auth_failed")
     if _is_model_not_found(response):
         if initial_model:
             denied = set(denied) | {initial_model}
@@ -1230,7 +1232,7 @@ async def generate_with_walking(
                 WalkStep(
                     model=model_id,
                     skipped=False,
-                    reason="model_not_found",
+                    reason=response.outcome or "model_not_found",
                     success=False,
                     error=response.error,
                     latency_ms=response.latency_ms,

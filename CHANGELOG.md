@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Discovery excludes model names associated with non-chat use (an assumed
+  name-based filter where capability data is unavailable). Per-model terms
+  acceptance errors now explain the provider response and can advance the
+  existing same-provider model walk; generic HTTP 400 errors no longer assert
+  a cause that was not established.
+- The live resilience eval checks each detected provider through the dashboard
+  Test endpoint unless explicitly skipped. Its live results label fallback-chain
+  entries as entries that may include skipped providers, not provider calls.
+- Live eval credential handling supports a hidden-key prompt, validates the
+  backend URL and supplied key before use, and revokes minted keys on exit;
+  revocation failures are reported with a prefix and a nonzero exit. The
+  dashboard shows the active key prefix and saved-provider count, and the
+  repository runbook explains the live workflow.
+
 - **`ROUTELLM_EVAL_API_KEY` is renamed `ROUTTENER_EVAL_API_KEY`** in the
   resilience eval, the printed hints and the README. The old name still works
   as a fallback and the new name wins when both are set, so an exported shell
