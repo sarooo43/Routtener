@@ -96,7 +96,13 @@ class GroqProvider(ModelProvider):
             data = None
             try:
                 data = response.json()
-                text = data["choices"][0]["message"]["content"]
+                choices = data["choices"]
+                if choices == []:
+                    text, finish_reason = None, None
+                else:
+                    choice = choices[0]
+                    text = choice["message"]["content"]
+                    finish_reason = choice.get("finish_reason")
             except (ValueError, KeyError, IndexError, TypeError) as exc:
                 return error_for_bad_response(
                     provider=self.provider_name,
@@ -104,17 +110,10 @@ class GroqProvider(ModelProvider):
                     detail=shape_detail(exc, data),
                     latency_ms=latency_ms,
                 )
-            if text is None:
-                return error_for_bad_response(
-                    provider=self.provider_name,
-                    model=model,
-                    detail="the message content was null",
-                    latency_ms=latency_ms,
-                )
             usage = data.get("usage") or {}
             return make_success(
                 self.provider_name, model, text, usage.get("total_tokens", 0), latency_ms,
-                finish_reason=data["choices"][0].get("finish_reason"),
+                finish_reason=finish_reason,
                 completion_tokens=usage.get("completion_tokens"),
             )
         except Exception as exc:

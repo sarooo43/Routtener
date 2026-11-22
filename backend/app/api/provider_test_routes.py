@@ -205,8 +205,9 @@ async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_
 
     attempted, skipped = _steps(walk)
     error = response.error
-    if response.outcome == "empty_response":
-        error = (f"empty_response: reply_length={response.reply_length} "
+    if response.outcome == "empty_response" or response.error == "empty_response":
+        verdict = "empty_response"
+        error = (f"empty_response: reply_length={response.reply_length if response.reply_length is not None else 'unavailable'} "
                  f"finish_reason={response.finish_reason or 'unavailable'} "
                  f"completion_tokens={response.completion_tokens if response.completion_tokens is not None else 'unavailable'}")
     return ProviderTestResponse(

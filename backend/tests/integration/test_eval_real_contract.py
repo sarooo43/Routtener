@@ -65,8 +65,21 @@ def real_gateway(tmp_path, request):
     preamble = (
         'from dataclasses import replace;import app.providers.model_registry as m;'
         + ''.join(f"m.PROVIDER_SPECS['{p}']=replace(m.PROVIDER_SPECS['{p}'],base_url='http://127.0.0.1:{stub.server_port}/{p}');" for p in ('groq', 'deepseek', 'gemini'))
-        + f"import uvicorn;uvicorn.run('app.main:app',host='127.0.0.1',port={port},log_level='critical')"
     )
+    if getattr(request, 'param', None) == 'legacy-empty':
+        # Exercise the real adapter and upstream while simulating an older
+        # internal response that had no machine-readable outcome or metadata.
+        preamble += """
+from app.providers.groq_provider import GroqProvider
+_original_generate = GroqProvider.generate
+async def _legacy_generate(self, *args, **kwargs):
+    result = await _original_generate(self, *args, **kwargs)
+    if result.error == 'empty_response':
+        result.outcome = result.reply_length = result.finish_reason = result.completion_tokens = None
+    return result
+GroqProvider.generate = _legacy_generate
+"""
+    preamble += f"\nimport uvicorn;uvicorn.run('app.main:app',host='127.0.0.1',port={port},log_level='critical')"
     env = dict(os.environ, DATABASE_URL=f"sqlite+aiosqlite:///{tmp_path / 'test.db'}",
                ROUTTENER_DATA_DIR=str(tmp_path / 'data'), REDIS_URL='', REQUIRE_API_KEY='false',
                CHAOS_MODE_ENABLED='true', DEMO_MODE_ENABLED='false', ALLOWED_HOSTS='*',

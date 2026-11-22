@@ -78,7 +78,7 @@ def make_error(
 def make_success(
     provider_name: str,
     model_name: str,
-    text: str,
+    text: Optional[str],
     tokens_used,
     latency_ms: float,
     http_status: Optional[int] = 200,
@@ -88,7 +88,7 @@ def make_success(
     if not text or not text.strip():
         result = make_error(provider_name, model_name, "empty_response", latency_ms,
                             outcome="empty_response", http_status=http_status)
-        result.reply_length = len(text) if isinstance(text, str) else 0
+        result.reply_length = len(text) if isinstance(text, str) else None
         # Untrusted provider values are not allowed to smuggle content or keys into logs.
         if isinstance(finish_reason, str) and finish_reason.upper() in {"STOP", "LENGTH", "MAX_TOKENS", "CONTENT_FILTER", "SAFETY", "RECITATION", "OTHER"}:
             result.finish_reason = finish_reason.upper()
