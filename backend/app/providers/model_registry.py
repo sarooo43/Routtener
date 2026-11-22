@@ -75,21 +75,6 @@ class ProviderSpec:
     default_model: str
     #: Ordered preference. First entry that the account actually offers wins.
     preferred_models: tuple[str, ...]
-    #: Substrings that disqualify a model from chat routing (embeddings, audio,
-    #: moderation, speech...). Matched case-insensitively anywhere in the id.
-    non_chat_markers: tuple[str, ...] = (
-        "embedding",
-        "embed",
-        "whisper",
-        "tts",
-        "audio",
-        "image",
-        "vision-preview",
-        "guard",
-        "moderation",
-        "rerank",
-        "aqa",
-    )
     #: True when the model name belongs IN the URL (Gemini), not in the body.
     model_in_path: bool = False
     #: Prefix a discovered id needs when placed in the path (Gemini: "models/").
@@ -150,16 +135,6 @@ PROVIDER_SPECS: dict[str, ProviderSpec] = {
             "gemini-1.5-flash-8b",
             "gemini-1.5-pro",
         ),
-        non_chat_markers=(
-            "embedding",
-            "embed",
-            "aqa",
-            "imagen",
-            "veo",
-            "tts",
-            "native-audio",
-            "thinking",
-        ),
         model_in_path=True,
         model_path_prefix="models/",  # validated: never doubled into the URL
     ),
@@ -170,7 +145,6 @@ PROVIDER_SPECS: dict[str, ProviderSpec] = {
         models_path="/v1/models",
         default_model="deepseek-chat",
         preferred_models=("deepseek-chat", "deepseek-reasoner"),
-        non_chat_markers=("embedding", "embed"),
     ),
 }
 
@@ -202,13 +176,18 @@ def key_transport(provider: str) -> str:
 # advertise a chat capability; keep this conservative shared denylist here.
 ASSUMED_NON_CHAT_NAME_MARKERS = (
     "tts", "orpheus", "whisper", "speech", "transcribe", "embed", "moderation",
+    "guard", "audio", "image", "vision-preview", "rerank", "aqa", "imagen",
+    "veo", "native-audio", "thinking",
 )
 
 
 def is_chat_capable(spec: ProviderSpec, model_id: str) -> bool:
-    """Filter out embeddings, audio, image and other non-chat endpoints."""
+    """ASSUMED name filter: match only at start of an ID token, not inside it."""
     lowered = model_id.lower()
-    return not any(marker in lowered for marker in (*spec.non_chat_markers, *ASSUMED_NON_CHAT_NAME_MARKERS))
+    return not any(
+        re.search(r"(?:^|[/.\-_])" + re.escape(marker), lowered)
+        for marker in ASSUMED_NON_CHAT_NAME_MARKERS
+    )
 
 
 def key_fingerprint(api_key: str) -> str:
@@ -275,7 +254,7 @@ def estimated_tier(provider: str, model_id: str) -> str:
 # --------------------------------------------------------------------------
 # Gemini Auto ALLOW-LIST (T2)
 #
-# Why an allow-list: the deny-list (non_chat_markers) only removes obvious
+# Why an allow-list: the name-based deny-list only removes obvious
 # non-chat endpoints. Everything else — codenames (gemini-4-argon), previews
 # (gemini-3-flash-preview), omni/lyria/robotics/deep-research/nano-banana
 # families — stayed eligible for Auto and could be picked the moment every

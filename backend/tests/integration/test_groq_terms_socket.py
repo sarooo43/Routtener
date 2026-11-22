@@ -195,3 +195,15 @@ def test_preexisting_pinned_orpheus_still_runs_and_walks(gateway):
     assert state['attempts'] == [ORPHEUS, 'aaa-chat']
     assert body['error'].startswith('model_terms_required:')
     assert ORPHEUS in body['error']
+
+
+def test_discovery_token_start_denylist_table_over_real_socket(gateway):
+    client, state = gateway
+    must_stay = ['battstone-chat', 'openai/gpt-oss-120b', 'safeguardian-chat']
+    must_go = [ORPHEUS, 'whisper-large-v3', 'text-embedding-3', 'llama-guard-3', 'voice-tts', 'foo/speech-recognition', 'text-moderation-latest']
+    state['models'] = must_stay + must_go
+    response = client.get('/api/v1/provider-keys/groq/models?refresh=true')
+    assert response.status_code == 200
+    ids = {item['id'] for item in response.json()['models']}
+    assert set(must_stay) <= ids
+    assert not set(must_go) & ids
