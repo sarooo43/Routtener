@@ -92,7 +92,12 @@ class GeminiProvider(ModelProvider):
             data = None
             try:
                 data = response.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                candidate = data["candidates"][0]
+                content = candidate["content"]
+                if isinstance(content, dict) and "parts" not in content and candidate.get("finishReason") == "MAX_TOKENS":
+                    text = ""
+                else:
+                    text = content["parts"][0]["text"]
             except (ValueError, KeyError, IndexError, TypeError) as exc:
                 # Gemini answers 200 with a promptFeedback block when it
                 # refuses content; that is a protocol answer, not a network one.
@@ -109,6 +114,8 @@ class GeminiProvider(ModelProvider):
                 text,
                 usage.get("totalTokenCount", 0),
                 latency_ms,
+                finish_reason=candidate.get("finishReason"),
+                completion_tokens=usage.get("candidatesTokenCount"),
             )
         except Exception as exc:
             return error_for_exception(

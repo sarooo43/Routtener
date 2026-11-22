@@ -15,7 +15,7 @@ The rule here is that a test must not be able to disagree with production:
 *   in Auto mode the SAME candidate walk routing uses, so "denied" models are
     skipped exactly as a real route would skip them.
 
-A 1-token prompt is the only difference, so a passing test predicts a working
+A small probe prompt is the only difference, so a passing test predicts a working
 route. Everything reported here (model, latency, outcome, the walk's
 attempted/skipped lists) comes from those live calls rather than stored state.
 
@@ -44,12 +44,15 @@ router = APIRouter(prefix="/provider-test", tags=["Provider test"])
 #: Cheapest possible request that still proves authentication AND model access.
 PROBE_PROMPT = "ping"
 PROBE_MAX_TOKENS = 1
+# Give the eval answer check enough room for models that use reasoning tokens.
+ANSWER_CHECK_MAX_TOKENS = 256
 
 #: Key-specific outcomes. Only these may be described as "your key".
 KEY_OUTCOMES = frozenset({"auth_failed", "missing_provider_key"})
 
 #: User-facing verdicts, one per outcome.
 VERDICT_BY_OUTCOME = {
+    "empty_response": "empty_response",
     "auth_failed": "auth_failed",
     "missing_provider_key": "auth_failed",
     "model_not_found": "model_not_found",
@@ -127,7 +130,7 @@ def _steps(walk) -> tuple[list[ProviderTestStep], list[ProviderTestStep]]:
     return attempted, skipped
 
 
-async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_row: ApiKeyDB):
+async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_row: ApiKeyDB, *, answer_check: bool = False):
     """Run the real path: discovery → ranked walk → outcome classification."""
     if not is_supported_provider(provider):
         raise HTTPException(status_code=404, detail="Unknown provider")
@@ -157,7 +160,7 @@ async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_
     # uses, driven by the same ranking. An explicit pin/override is tried
     # first; otherwise the top-ranked discovered model goes first and a
     # model_not_found moves on to the next candidate.
-    kwargs = {"provider_api_key": effective_key, "max_tokens": PROBE_MAX_TOKENS}
+    kwargs = {"provider_api_key": effective_key, "max_tokens": ANSWER_CHECK_MAX_TOKENS if answer_check else PROBE_MAX_TOKENS}
     if provider == "deepseek":
         kwargs["task_type"] = "general"
     walk = await walk_candidates(
@@ -201,6 +204,11 @@ async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_
             available, model_source = [], None
 
     attempted, skipped = _steps(walk)
+    error = response.error
+    if response.outcome == "empty_response":
+        error = (f"empty_response: reply_length={response.reply_length} "
+                 f"finish_reason={response.finish_reason or 'unavailable'} "
+                 f"completion_tokens={response.completion_tokens if response.completion_tokens is not None else 'unavailable'}")
     return ProviderTestResponse(
         provider=provider,
         display=_display(provider),
@@ -208,7 +216,7 @@ async def _probe(provider: str, api_key: str, db_session: AsyncSession, api_key_
         key_valid=False,
         model=response.model_name or walk.model_used,
         latency_ms=round(response.latency_ms, 1),
-        error=response.error,
+        error=error,
         available_models=available[:50],
         model_source=model_source,
         attempted=attempted,
@@ -221,6 +229,7 @@ async def test_provider(
     provider: str,
     api_key_row: ApiKeyDB = Depends(require_api_key),
     db_session: AsyncSession = Depends(get_session),
+    answer_check: bool = False,
 ) -> ProviderTestResponse:
     """Live probe of one provider using the caller's stored key.
 
@@ -229,7 +238,7 @@ async def test_provider(
     """
     check_and_acquire(api_key_row.id)
     try:
-        return await _probe(provider, "", db_session, api_key_row)
+        return await _probe(provider, "", db_session, api_key_row, answer_check=answer_check)
     except ProviderKeyEncryptionError as exc:
         # Encryption key missing or replaced (e.g. ./data was deleted): the
         # stored ciphertext cannot be read. That is an operator problem with a

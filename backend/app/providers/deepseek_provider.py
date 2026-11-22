@@ -136,7 +136,9 @@ class DeepSeekProvider(ModelProvider):
                 )
             usage = data.get("usage") or {}
             return make_success(
-                self.provider_name, model, text, usage.get("total_tokens", 0), latency_ms
+                self.provider_name, model, text, usage.get("total_tokens", 0), latency_ms,
+                finish_reason=data["choices"][0].get("finish_reason"),
+                completion_tokens=usage.get("completion_tokens"),
             )
         except Exception as exc:
             return error_for_exception(
