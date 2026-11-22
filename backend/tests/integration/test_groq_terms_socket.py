@@ -25,7 +25,7 @@ TERMS_MESSAGE = ('The model `canopylabs/orpheus-v1-english` requires terms accep
 @pytest.fixture
 def gateway(tmp_path, request):
     state = {'models': ['aaa-chat', 'zzz-chat', ORPHEUS, 'whisper-large-v3', 'text-embedding-3'],
-             'fail': set(), 'attempts': [], 'message_only': False, 'generic': False}
+             'fail': set(), 'attempts': [], 'message_only': False, 'generic': False, 'http401': False}
     class Stub(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
@@ -42,7 +42,9 @@ def gateway(tmp_path, request):
             body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             model = body['model']
             state['attempts'].append(model)
-            if model in state['fail'] and state['generic']:
+            if model in state['fail'] and state['http401']:
+                self.send({'error': {'message': 'credential rejected', 'type': 'authentication_error'}}, 401)
+            elif model in state['fail'] and state['generic']:
                 self.send({'error': {'message': 'Request rejected by policy; token=gsk_FAKE000000000000'}}, 400)
             elif model in state['fail']:
                 err = {'message': TERMS_MESSAGE, 'type': 'invalid_request_error'}
@@ -64,8 +66,9 @@ def gateway(tmp_path, request):
         env.pop(name, None)
     if getattr(request, 'param', None) == 'orpheus':
         env['GROQ_MODEL'] = ORPHEUS
+    provider = 'deepseek' if getattr(request, 'param', None) == 'deepseek' else 'groq'
     code = ("from dataclasses import replace;import app.providers.model_registry as m;"
-            f"m.PROVIDER_SPECS['groq']=replace(m.PROVIDER_SPECS['groq'],base_url='http://127.0.0.1:{server.server_port}');"
+            f"m.PROVIDER_SPECS['{provider}']=replace(m.PROVIDER_SPECS['{provider}'],base_url='http://127.0.0.1:{server.server_port}');"
             f"import uvicorn;uvicorn.run('app.main:app',host='127.0.0.1',port={port},log_level='critical')")
     process = subprocess.Popen([sys.executable, '-c', code], cwd=ROOT / 'backend', env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -83,7 +86,8 @@ def gateway(tmp_path, request):
         with httpx.Client(base_url=base, timeout=30) as client:
             key = client.post('/api/v1/keys/generate', json={'label': 'local'}).json()['api_key']
             client.headers['X-API-Key'] = key
-            assert client.put('/api/v1/provider-keys/groq', json={'api_key': 'gsk_FAKE000000000000'}).status_code == 200
+            fake = 'sk-FAKE000000000000' if provider == 'deepseek' else 'gsk_FAKE000000000000'
+            assert client.put('/api/v1/provider-keys/' + provider, json={'api_key': fake}).status_code == 200
             if getattr(request, 'param', None) == 'existing_pin':
                 with sqlite3.connect(tmp_path / 'db') as db:
                     owner_id = db.execute('SELECT id FROM api_keys ORDER BY id DESC LIMIT 1').fetchone()[0]
@@ -195,3 +199,103 @@ def test_preexisting_pinned_orpheus_still_runs_and_walks(gateway):
     assert state['attempts'] == [ORPHEUS, 'aaa-chat']
     assert body['error'].startswith('model_terms_required:')
     assert ORPHEUS in body['error']
+
+
+def test_discovery_token_start_denylist_table_over_real_socket(gateway):
+    client, state = gateway
+    must_stay = ['battstone-chat', 'openai/gpt-oss-120b', 'safeguardian-chat']
+    must_go = [ORPHEUS, 'whisper-large-v3', 'text-embedding-3', 'llama-guard-3', 'voice-tts', 'foo/speech-recognition', 'text-moderation-latest']
+    state['models'] = must_stay + must_go
+    response = client.get('/api/v1/provider-keys/groq/models?refresh=true')
+    assert response.status_code == 200
+    ids = {item['id'] for item in response.json()['models']}
+    assert set(must_stay) <= ids
+    assert not set(must_go) & ids
+
+
+# The DeepSeek response shapes below are from memory, not verified live.
+@pytest.mark.parametrize('gateway', ['deepseek'], indirect=True)
+def test_deepseek_socket_discovery_filters_non_chat(gateway):
+    client, state = gateway
+    state['models'] = ['deepseek-chat', 'deepseek-reasoner', 'whisper-large-v3', 'text-embedding-3']
+    result = client.get('/api/v1/provider-keys/deepseek/models?refresh=true')
+    assert result.status_code == 200
+    ids = {row['id'] for row in result.json()['models']}
+    assert ids == {'deepseek-chat', 'deepseek-reasoner'}
+
+
+@pytest.mark.parametrize('gateway', ['deepseek'], indirect=True)
+def test_deepseek_socket_401_maps_auth_failed(gateway):
+    client, state = gateway
+    state['models'], state['fail'], state['http401'] = ['aaa-chat'], {'aaa-chat'}, True
+    response = client.post('/api/v1/provider-test/deepseek')
+    assert response.status_code == 200
+    assert response.json()['verdict'] == 'auth_failed'
+    assert response.json()['error'].startswith('auth_failed:')
+
+
+@pytest.mark.parametrize('gateway', ['deepseek'], indirect=True)
+def test_deepseek_socket_400_is_neutral_with_provider_message(gateway):
+    client, state = gateway
+    state['models'], state['fail'], state['generic'] = ['aaa-chat'], {'aaa-chat'}, True
+    response = client.post('/api/v1/provider-test/deepseek')
+    assert response.status_code == 200
+    message = response.json()['error']
+    assert 'rejected the request (HTTP 400)' in message
+    assert 'Request rejected by policy' in message
+    assert 'bug in how' not in message
+    assert 'gsk_FAKE000000000000' not in message
+
+
+@pytest.mark.parametrize('gateway', ['deepseek'], indirect=True)
+def test_deepseek_socket_200_chat_reply_is_parsed(gateway):
+    client, state = gateway
+    state['models'] = ['deepseek-chat']
+    response = client.post('/api/v1/route', json={'prompt': 'hello', 'task_type': 'code'})
+    assert response.status_code == 200
+    body = response.json()
+    assert body['success'] is True and body['result'] == 'ok'
+    assert body['model_used'] == 'deepseek'
+    assert state['attempts'] == ['deepseek-chat']
+
+
+@pytest.mark.parametrize('gateway', ['auto', 'existing_pin'], indirect=True)
+def test_postfix_reproduction(gateway, request):
+    client, state = gateway
+    pinned = request.node.callspec.params['gateway'] == 'existing_pin'
+    for case, models in ([('pin_orpheus_plus_chat', [ORPHEUS, 'aaa-chat'])] if pinned else
+                         [('orpheus_only', [ORPHEUS]), ('orpheus_plus_chat', [ORPHEUS, 'aaa-chat'])]):
+        state['models'] = models
+        state['fail'] = {ORPHEUS}
+        state['attempts'].clear()
+        listing = client.get('/api/v1/provider-keys/groq/models?refresh=true')
+        print('CASE', case, 'AUTO_LIST', listing.status_code, listing.text)
+        pin = client.put('/api/v1/provider-keys/groq/model', json={'model_id': ORPHEUS}) if not pinned else None
+        if pin is not None:
+            print('CASE', case, 'PIN_FILTERED', pin.status_code, pin.text)
+            assert pin.status_code in (422, 503)
+        state['attempts'].clear()
+        test = client.post('/api/v1/provider-test/groq')
+        print('CASE', case, 'TEST_MODELS', json.dumps(state['attempts']), 'TEST', test.status_code, test.text)
+        state['attempts'].clear()
+        route = client.post('/api/v1/route', json={'prompt': 'hello', 'task_type': 'qa'})
+        print('CASE', case, 'ROUTE_MODELS', json.dumps(state['attempts']), 'ROUTE', route.status_code, route.text)
+        assert route.status_code == 200 and route.json()['success']
+        if case == 'orpheus_only':
+            assert state['attempts'] == ['llama-3.3-70b-versatile']
+        elif pinned:
+            assert state['attempts'] == [ORPHEUS, 'aaa-chat']
+            assert route.json()['error'].startswith('model_terms_required:')
+        else:
+            assert state['attempts'] == ['aaa-chat']
+
+
+@pytest.mark.parametrize('gateway', ['orpheus'], indirect=True)
+def test_postfix_terms_error_when_no_model_remains(gateway):
+    client, state = gateway
+    state['models'], state['fail'] = [ORPHEUS], {ORPHEUS}
+    response = client.post('/api/v1/provider-test/groq')
+    print('NO_MODELS_LEFT', response.status_code, response.text)
+    assert response.json()['key_valid'] is False
+    assert response.json()['error'].startswith('model_terms_required:')
+    assert state['attempts'] == [ORPHEUS]

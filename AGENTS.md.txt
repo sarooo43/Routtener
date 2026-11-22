@@ -1,4 +1,4 @@
-# Project: RouteLLM — Intelligent Multi-Model AI Router
+# Project: Routtener — Intelligent Multi-Model AI Router
 
 You (the AI agent) are the lead engineer building this project. Follow the PRD/TRD/Architecture docs located in `/docs`. Do not deviate from documented specs without asking first.
 
@@ -6,7 +6,7 @@ You (the AI agent) are the lead engineer building this project. Follow the PRD/T
 
 ## 🧠 Project Summary
 
-RouteLLM is a self-healing LLM gateway. It classifies incoming tasks, scores available models based on task-fit/cost/reliability/latency, calls the best one, and automatically falls back through a ranked chain if a model fails, times out, hits a rate limit, or runs out of credits. Everything is logged and visualized on a real-time animated dashboard.
+Routtener is a self-healing LLM gateway. It classifies incoming tasks, scores available models based on task-fit/cost/reliability/latency, calls the best one, and automatically falls back through a ranked chain if a model fails, times out, hits a rate limit, or runs out of credits. Everything is logged and visualized on a real-time animated dashboard.
 
 ---
 
@@ -36,7 +36,7 @@ RouteLLM is a self-healing LLM gateway. It classifies incoming tasks, scores ava
 
 ## 🤖 Model Provider Registry
 
-RouteLLM integrates providers chosen deliberately for **their known strengths per task type**, plus generous free tiers to keep this project runnable without a budget. Build adapters for all of these — the router's intelligence comes from having real diversity to choose from.
+Routtener integrates providers chosen deliberately for **their known strengths per task type**, plus generous free tiers to keep this project runnable without a budget. Build adapters for all of these — the router's intelligence comes from having real diversity to choose from.
 
 | Provider | Model(s) | Known Strength | Best Task Types | Tier |
 |---|---|---|---|---|
