@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Corrected stale Routtener project names and checkout instructions in legacy
+  planning documents, the contributing guide and the dev-requirements header.
+
 - Discovery excludes model names associated with non-chat use (an assumed
   name-based filter where capability data is unavailable). Per-model terms
   acceptance errors now explain the provider response and can advance the
