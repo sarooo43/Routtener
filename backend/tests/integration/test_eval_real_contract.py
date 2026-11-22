@@ -108,7 +108,7 @@ def _owner(base, providers=("groq", "deepseek")):
         key = r.json()['api_key']
         assert isinstance(key, str) and key.startswith('rk_')
         headers = {'X-API-Key': key}
-        for provider, fake in [('groq', 'gsk_FAKE000000000000'), ('deepseek', 'sk-FAKE000000000000')]:
+        for provider, fake in [('groq', 'gsk_FAKE000000000000'), ('deepseek', 'sk-FAKE000000000000'), ('gemini', 'AIzaFAKE0000000000000000000000')]:
             if provider not in providers:
                 continue
             assert client.put('/api/v1/provider-keys/' + provider, headers=headers, json={'api_key': fake}).status_code == 200
@@ -237,4 +237,21 @@ def test_one_detected_provider_is_still_checked_before_fatal(real_gateway):
     assert result.returncode != 0
     assert 'Provider check groq: PASS' in result.stdout
     assert 'FATAL: fewer than 2 provider checks passed' in result.stderr
+    assert key not in result.stdout + result.stderr
+
+
+def test_live_results_label_with_actual_upstream_failure_and_fallback(real_gateway, tmp_path):
+    base, env = real_gateway
+    key = _owner(base, ('groq', 'deepseek', 'gemini'))
+    ProviderStub.failures = {'gemini'}
+    copy = tmp_path / 'copy'
+    shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns('.git', '.venv', 'node_modules', '__pycache__', '.pytest_cache', 'data', 'dist', '*.db', '.env'))
+    run_env = dict(env, ROUTTENER_EVAL_API_KEY=key, PYTHONPATH=str(copy / 'backend'))
+    result = subprocess.run([sys.executable, str(copy / 'evals' / 'run_resilience_eval.py'), '--live', '--yes-spend-quota', '--base-url', base, '--n', '1', '--json'], cwd=copy, env=run_env, capture_output=True, text=True, timeout=90)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout[result.stdout.index('{\n  "eval": "resilience"'):])
+    assert payload['scenarios'][0]['router']['successes'] == 1
+    assert sum(name == 'deepseek' for name, _ in ProviderStub.calls) >= 2
+    assert sum(name == 'gemini' for name, _ in ProviderStub.calls) >= 2
+    assert 'chain entries (may include skipped providers)' in (copy / 'docs' / 'eval-results.md').read_text()
     assert key not in result.stdout + result.stderr
