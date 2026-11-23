@@ -7,8 +7,8 @@ showing you exactly what it decided and why.
 
 [![CI](https://github.com/sarooo43/Routtener/actions/workflows/ci.yml/badge.svg)](https://github.com/sarooo43/Routtener/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](https://www.python.org/downloads/)
-[![Node 22.19+ (only to build the UI)](https://img.shields.io/badge/node-22.19%2B%20(optional)-339933.svg)](https://nodejs.org)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11_plus-3776ab.svg)](https://www.python.org/downloads/)
+[![Node 22.19+ (only to build the UI)](https://img.shields.io/badge/node-22.19_plus_optional-339933.svg)](https://nodejs.org)
 
 > **Name:** this project is called **Routtener**. It was previously called
 > RouteLLM — a name it shared, entirely coincidentally, with **LMSYS RouteLLM**,
@@ -40,10 +40,6 @@ git clone https://github.com/sarooo43/Routtener.git
 cd Routtener
 python run.py
 ```
-
-(All clone/badge URLs in this README use the pre-rename repo name, which
-GitHub redirects after a rename — see the release notes for the list to
-update once the repository itself is renamed.)
 
 `run.py` creates a virtualenv, installs the backend, builds the dashboard if
 Node is available (or uses a prebuilt one), creates `./data`, and opens
@@ -216,12 +212,6 @@ flowchart LR
 
 ## Screenshots
 
-<!-- OWNER TASK: add the four PNGs listed below to docs/images/ before
-     tagging v0.1.0. The references are slots — the image files do not exist
-     in the repository yet, so this section will render broken-image icons
-     until they are committed. Nothing here claims a measured result; the
-     numbers story lives in Benchmarks. -->
-
 | Dashboard overview | Model Explorer |
 |---|---|
 | ![Dashboard overview: KPIs, live request feed and provider health](docs/images/overview.png) | ![Model Explorer: routing decision, per-model statuses and Run diagnostics](docs/images/explorer.png) |
@@ -321,10 +311,18 @@ How the other runners relate (all kept; none is deleted):
 
 ## Evals
 
+### Results
+
+**UNVERIFIED:** Live resilience eval: not yet run for v0.1.0. Results will be added after a run against two real providers.
+
+Mocked-mode runs test routing logic only, not real-provider behavior; their results are not published. The live resilience eval can demonstrate that failover works during its simulated outage, not how often providers fail.
+
+### Running the evals
+
 The repository also ships an eval suite (`evals/`) that checks routing
 accuracy (labeled prompts, confusion matrix, calibration bins), resilience
 (5 scripted failure scenarios vs a naive single-provider baseline, Wilson
-95% intervals), quality (exact-match math / unit-tested code / JSON schema —
+confidence intervals), quality (exact-match math / unit-tested code / JSON schema —
 no LLM judge) and routing overhead (p50/p95). One command runs all of it:
 
 ```bash
@@ -374,9 +372,24 @@ only its prefix.
 The pre-rename name `ROUTELLM_EVAL_API_KEY` still works as a fallback;
 `ROUTTENER_EVAL_API_KEY` wins when both are set.
 
-Every success rate the suite prints carries a Wilson 95% interval,
+Every success rate the suite prints carries a Wilson confidence interval,
 and each report states what the numbers do not show. See
 [evals/REVIEW.md](evals/REVIEW.md) for how to review the label dataset.
+
+---
+
+## Known limitations
+
+- The release zip omits `docs/images/`, so screenshots show only in the GitHub README.
+- Python 3.14 is not in CI.
+- UNVERIFIED: No request-body size limit was found in the application code; deployment-level limits were not checked.
+- ASSUMED: The non-chat name filter is based on model names, not provider capability data; Gemini also uses advertised generation methods when available.
+- CI provisions Postgres and Redis, but per-test service counts were not verified.
+- A filtered pin returns 503 when discovery leaves no chat models (rather than 422); a fix is planned for v0.2. If other chat models remain, it returns 422.
+- UNVERIFIED: If no chat model is discovered, the app falls back to a static model; this fallback has not been verified against live providers.
+- An empty reply does not walk to the next model of the same provider.
+- UNVERIFIED: DeepSeek has not been verified live.
+- ASSUMED: Quoted free-tier limits are estimates, not verified current provider quotas.
 
 ---
 
@@ -384,14 +397,12 @@ and each report states what the numbers do not show. See
 
 Local-first is the point, not a setting.
 
-- **Your prompts go to the provider you configured** — Groq, Google AI Studio
-  or DeepSeek — and nowhere else. There is no telemetry, no analytics beacon and
-  no phone-home.
+- **Your prompts go to the provider selected for a request** — Groq, Google AI Studio
+  or DeepSeek. UNVERIFIED: Independent deployments may add logging or telemetry.
 - **Demo mode makes no network call at all.**
-- **Provider keys never leave the machine.** They are Fernet-encrypted before
-  touching the database and returned only as a 4-character hint.
-- **The gateway binds `127.0.0.1`.** `--host 0.0.0.0` prints a warning, because
-  anyone who can reach the port can spend your provider credits.
+- **Provider keys are encrypted at rest** and sent to their configured provider;
+  the dashboard returns only a 4-character hint after saving.
+- **Keep the gateway private.** `python run.py` binds `127.0.0.1` by default (unless `HOST` or `--host` overrides it). Do not expose the port publicly or bind `0.0.0.0`: key generation is unauthenticated, including in local mode, and anyone who can reach the port may spend your provider credits.
 - **Never commit `backend/.env`.** `backend/scripts/check_secrets.py` scans the
   working tree *and* git history for credentials and masks anything it finds.
 

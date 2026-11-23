@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-22
+
 ### Changed
+
+- UNVERIFIED: The live resilience eval has not yet been run for this release.
 
 - Corrected stale Routtener project names and checkout instructions in legacy
   planning documents, the contributing guide and the dev-requirements header.
@@ -77,14 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Cloud CI jobs (`hf-space-boot`, `cloudflare-worker`) and `docs/deploy`
   contents are intentionally left as they were on main.
 
-- CI now tests the launcher's full support range: the backend suite runs on
-  Python 3.11 and 3.12, and the frontend job type-checks, lints and builds, so a
-  broken `frontend/dist` cannot reach a user's first run.
 - **CI and repo trimmed of the cloud experiments.** The `cloudflare-worker` and
-  `hf-space-boot` CI jobs are removed (the remaining jobs: secret-scan,
-  backend tests on 3.11+3.12, the slow git-history suite, an informational
-  Python 3.13 run, and the frontend job). The Worker code is archived — not
-  deleted — under `docs/deploy/cloudflare/` with the exact state of the
+  `hf-space-boot` CI jobs are removed. The remaining jobs are secret-scan,
+  backend tests on 3.11 and 3.12, the slow git-history suite, an informational
+  Python 3.13 run, and the frontend tests, typecheck, lint and build. The Worker
+  code is archived — not deleted — under `docs/deploy/cloudflare/` with the exact state of the
   attempt tagged `cloud-deploy-attempt`; the root `wrangler` devDependency and
   the `deploy` / `test:cloudflare` scripts remain in the repository. Local-first
   (`python run.py`) is the supported path.
@@ -122,11 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   scenario failures, interrupts, and server loss for minted and supplied keys.
 - **Provider wire-contract tests over a real local socket**, replacing the
   assumption that a `respx` fake returns the shape a provider really sends.
-- **The benchmark report also lands in `docs/benchmark-results.md`.** The one
-  benchmark command now writes its Markdown report to
-  `benchmark/results/REPORT.md` AND the repo-root docs location the README
-  links to. Both are produced by your own run; no benchmark numbers are
-  committed to the repository.
 - **One-command local run.** `python run.py` (also `./start.sh`,
   `.\start.ps1`) creates a virtualenv, installs dependencies, builds the
   dashboard or uses a prebuilt one, creates the data directory, and serves the
@@ -175,9 +171,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   (`backend/.venv/Scripts/python.exe benchmark/run_benchmark.py`) runs the
   naive-single-model baseline and the full router over the same 37 prompts
   under normal conditions AND a Chaos-Mode simulated outage, then writes
-  `benchmark/results/REPORT.md` — a Markdown results table carrying the date,
-  the models each arm used, and the naive vs router success rates. The repo
-  ships no benchmark numbers: results are produced only by the owner's own
+  `benchmark/results/REPORT.md` and `docs/benchmark-results.md` — Markdown
+  results tables carrying the date, models, and naive vs router success rates.
+  The repo ships no benchmark numbers: results are produced only by the owner's own
   run with their own provider keys.
 - `APP_NAME` / `APP_VERSION` constants (backend `app/identity.py`, frontend
   `src/appInfo.ts`) with the LMSYS name-collision disclaimer written once.
