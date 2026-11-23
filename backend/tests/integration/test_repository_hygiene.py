@@ -7,6 +7,7 @@ rules are asserted here too.
 """
 
 import re
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -68,8 +69,24 @@ def test_readme_badge_matches_the_licence():
 
 def test_changelog_collects_first_release_in_unreleased():
     text = _read("CHANGELOG.md")
-    assert re.search(r"^## \[Unreleased\]", text, re.MULTILINE)
-    assert not re.search(r"^## \[0\.1\.0\]", text, re.MULTILINE)
+    headings = re.findall(r"^##[ \t]+(.+?)[ \t]*$", text, re.MULTILINE)
+    assert headings and headings[0] == "[Unreleased]", "Unreleased must be the first section"
+    assert headings.count("[Unreleased]") == 1, "Unreleased must not be duplicated"
+
+    seen_versions = set()
+    for heading in headings[1:]:
+        version = re.match(r"^\[(\d+\.\d+\.\d+)\]", heading)
+        assert version, f"malformed version heading: {heading}"
+        assert version.group(1) not in seen_versions, f"duplicate version: {version.group(1)}"
+        seen_versions.add(version.group(1))
+        dated = re.fullmatch(r"\[(\d+\.\d+\.\d+)\] - (\d{4}-\d{2}-\d{2})", heading)
+        assert dated, f"malformed dated version heading: {heading}"
+        try:
+            date.fromisoformat(dated.group(2))
+        except ValueError as exc:
+            raise AssertionError(f"invalid release date: {dated.group(2)}") from exc
+
+    assert "0.1.0" in seen_versions, "the first release must be recorded"
     assert "Prompt classification" in text
     assert "Execution with automatic fallback" in text
 

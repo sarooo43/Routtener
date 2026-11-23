@@ -380,6 +380,7 @@ and each report states what the numbers do not show. See
 
 ## Known limitations
 
+- The release zip omits `docs/images/`, so screenshots show only in the GitHub README.
 - Python 3.14 is not in CI.
 - UNVERIFIED: No request-body size limit was found in the application code; deployment-level limits were not checked.
 - ASSUMED: The non-chat name filter is based on model names, not provider capability data; Gemini also uses advertised generation methods when available.
